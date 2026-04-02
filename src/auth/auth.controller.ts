@@ -10,7 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto, SignInDto } from './dto/auth.dto';
 import { UserDocument } from 'src/users/schema/user.schema';

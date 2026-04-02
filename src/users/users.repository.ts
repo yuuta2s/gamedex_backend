@@ -1,58 +1,52 @@
+// src/users/users.repository.ts
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { CreateUserDto } from 'src/auth/dto/auth.dto';
-import { User, UserDocument } from './schema/user.schema';
-
+import { Prisma, User } from '@prisma/client';
+import { PrismaService } from 'prisma/prisma.service';
 
 @Injectable()
 export class UsersRepository {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateUserDto & { password?: string }): Promise<UserDocument> {
-    const user = new this.userModel(dto);
-    return user.save();
+  async create(data: Prisma.UserCreateInput): Promise<User> {
+    return this.prisma.user.create({ data });
   }
 
-  async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ email }).exec();
+  async findByEmail(email: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { email } });
   }
 
-  async findById(id: string): Promise<UserDocument | null> {
-    return this.userModel.findById(id).exec();
+  async findById(id: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { id } });
   }
 
-  async findBySteamId(steamId: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ steamId }).exec();
+  async findBySteamId(steamId: string): Promise<User | null> {
+    return this.prisma.user.findUnique({ where: { steamId } });
   }
 
-  /**
-   * Create a user from Steam profile (no password).
-   * If user already exists (by steamId), return existing.
-   */
   async findOrCreateSteamUser(profile: {
     steamId: string;
     username: string;
     avatar?: string;
-  }): Promise<UserDocument> {
-    let user = await this.findBySteamId(profile.steamId);
-    if (!user) {
-      user = new this.userModel({
+  }): Promise<User> {
+    return this.prisma.user.upsert({
+      where: { steamId: profile.steamId },
+      update: {},
+      create: {
         steamId: profile.steamId,
         username: profile.username,
         avatar: profile.avatar,
         steamDisplayName: profile.username,
-      });
-      await user.save();
-    }
-    return user;
+      },
+    });
   }
 
   async updateRefreshToken(
-    user: UserDocument,
+    userId: string,
     hashedToken: string | null,
   ): Promise<void> {
-    user.refreshToken = hashedToken ?? undefined;
-    await user.save();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken: hashedToken },
+    });
   }
 }
