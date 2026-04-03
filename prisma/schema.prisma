@@ -7,14 +7,129 @@ datasource db {
 }
 
 model User {
-  id               String   @id @default(cuid())
-  email            String?  @unique
-  username         String
-  password         String?
-  steamId          String?  @unique
-  steamDisplayName String?
-  avatar           String?
-  refreshToken     String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id           String   @id @default(cuid())
+  username     String
+  email        String?  @unique
+  passwordHash String?
+  avatar       String?
+  biography    String?
+  steamId      String?  @unique
+  refreshToken String?
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+
+  library        Library[]
+  wishlist       Wishlist[]
+  rates          Rate[]
+  achievements   UserAchievement[]
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Platform {
+  id           String    @id @default(cuid())
+  name         String    @unique
+  manufacturer String?
+
+  library      Library[]
+}
+
+model Game {
+  id          String    @id @default(cuid())
+  steamAppId  String?   @unique
+  title       String
+  description String?
+  releaseDate DateTime?
+  coverUrl    String?
+  developer   String?
+  publisher   String?
+  createdAt   DateTime  @default(now())
+
+  library     Library[]
+  wishlist    Wishlist[]
+  rates       Rate[]
+  tags        GameTag[]
+}
+
+model Tag {
+  id    String    @id @default(cuid())
+  label String    @unique
+
+  games GameTag[]
+}
+
+model GameTag {
+  game   Game   @relation(fields: [gameId], references: [id])
+  gameId String
+  tag    Tag    @relation(fields: [tagId], references: [id])
+  tagId  String
+
+  @@id([gameId, tagId])
+}
+
+model Library {
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  game       Game     @relation(fields: [gameId], references: [id])
+  gameId     String
+  platform   Platform @relation(fields: [platformId], references: [id])
+  platformId String
+  playtime   Int?
+  status     GameStatus @default(PLAYING)
+  addedAt    DateTime   @default(now())
+
+  @@id([userId, gameId, platformId])
+}
+
+enum GameStatus {
+  PLAYING
+  COMPLETED
+  ABANDONED
+  WANTS_TO_PLAY
+}
+
+model Wishlist {
+  user    User     @relation(fields: [userId], references: [id])
+  userId  String
+  game    Game     @relation(fields: [gameId], references: [id])
+  gameId  String
+  addedAt DateTime @default(now())
+
+  @@id([userId, gameId])
+}
+
+model Rate {
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  game       Game     @relation(fields: [gameId], references: [id])
+  gameId     String
+  score      Int
+  textReview String?
+  createdAt  DateTime @default(now())
+
+  @@id([userId, gameId])
+}
+
+model Achievement {
+  id          String  @id @default(cuid())
+  title       String  @unique
+  description String
+  icon        String?
+  condition   String
+  points      Int     @default(0)
+
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  user          User        @relation(fields: [userId], references: [id])
+  userId        String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  achievementId String
+  unlockedAt    DateTime    @default(now())
+
+  @@id([userId, achievementId])
 }

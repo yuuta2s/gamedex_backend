@@ -1,8 +1,15 @@
+// Inscription classique Gamedex
 export class CreateUserDto {
   email: string;
   password: string;
   username: string;
-  avatar?: string; // URL or path after upload, not raw File
+  avatar?: string;
+}
+
+export class CreateSteamUserDto {
+  steamId: string;
+  username: string;
+  avatar?: string;
 }
 
 export class SignInDto {
@@ -12,7 +19,7 @@ export class SignInDto {
 
 export class UserResponseDto {
   id: string;
-  email: string;
+  email?: string;
   username: string;
   avatar?: string;
   isSteamLinked: boolean;

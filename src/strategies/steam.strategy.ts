@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-steam';
-import { UserDocument } from 'src/users/schema/user.schema';
+import { User } from '@prisma/client';
 import { UsersRepository } from 'src/users/users.repository';
 
 @Injectable()
@@ -15,17 +15,9 @@ export class SteamStrategy extends PassportStrategy(Strategy, 'steam') {
       throw new Error('Steam environment variables are missing');
     }
 
-    super({
-      returnURL,
-      realm,
-      apiKey,
-    });
+    super({ returnURL, realm, apiKey });
   }
 
-  /**
-   * Called by Passport after Steam redirects back.
-   * `profile` is the Steam profile from the OpenID response.
-   */
   async validate(
     _identifier: string,
     profile: {
@@ -33,15 +25,13 @@ export class SteamStrategy extends PassportStrategy(Strategy, 'steam') {
       displayName: string;
       photos?: { value: string }[];
     },
-  ): Promise<UserDocument> {
+  ): Promise<User> {
     const avatar = profile.photos?.[0]?.value;
 
-    const user = await this.usersRepository.findOrCreateSteamUser({
+    return this.usersRepository.findOrCreateSteamUser({
       steamId: profile.id,
       username: profile.displayName,
       avatar,
     });
-
-    return user;
   }
 }

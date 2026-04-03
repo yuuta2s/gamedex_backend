@@ -2,10 +2,10 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
-  Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { User } from '@prisma/client';
 
 import {
   AuthResponseDto,
@@ -13,7 +13,6 @@ import {
   SignInDto,
   TokensDto,
 } from './dto/auth.dto';
-import { UserDocument } from 'src/users/schema/user.schema';
 import { UsersRepository } from 'src/users/users.repository';
 import { AuthMapper } from './auth.mapper';
 
@@ -27,64 +26,45 @@ export class AuthService {
     private readonly authMapper: AuthMapper,
   ) {}
 
-  // ──────────────────────────────────────────────────────────────
-  // Sign Up (email + password)
-  // ──────────────────────────────────────────────────────────────
-
   async signUp(dto: CreateUserDto): Promise<AuthResponseDto> {
     const existing = await this.usersRepository.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email already in use');
 
-    const hashedPassword = await bcrypt.hash(dto.password, this.SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(dto.password, this.SALT_ROUNDS);
 
     const user = await this.usersRepository.create({
       ...dto,
-      password: hashedPassword,
+      passwordHash,
     });
 
     const tokens = this.generateTokens(user);
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, this.SALT_ROUNDS);
-    await this.usersRepository.updateRefreshToken(user, hashedRefresh);
+    await this.usersRepository.updateRefreshToken(user.id, hashedRefresh);
 
     return this.authMapper.toAuthResponse(user, tokens);
   }
-
-  // ──────────────────────────────────────────────────────────────
-  // Sign In (email + password)
-  // ──────────────────────────────────────────────────────────────
 
   async signIn(dto: SignInDto): Promise<AuthResponseDto> {
     const user = await this.validateUser(dto.email, dto.password);
 
     const tokens = this.generateTokens(user);
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, this.SALT_ROUNDS);
-    await this.usersRepository.updateRefreshToken(user, hashedRefresh);
+    await this.usersRepository.updateRefreshToken(user.id, hashedRefresh);
 
     return this.authMapper.toAuthResponse(user, tokens);
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Sign In with Steam (called after Passport validates the user)
-  // ──────────────────────────────────────────────────────────────
-
-  async signInWithSteam(user: UserDocument): Promise<AuthResponseDto> {
+  async signInWithSteam(user: User): Promise<AuthResponseDto> {
     const tokens = this.generateTokens(user);
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, this.SALT_ROUNDS);
-    await this.usersRepository.updateRefreshToken(user, hashedRefresh);
+    await this.usersRepository.updateRefreshToken(user.id, hashedRefresh);
 
     return this.authMapper.toAuthResponse(user, tokens);
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Refresh Tokens
-  // ──────────────────────────────────────────────────────────────
-
-  async refreshTokens(
-    userId: string,
-    refreshToken: string,
-  ): Promise<TokensDto> {
+  async refreshTokens(userId: string, refreshToken: string): Promise<TokensDto> {
     const user = await this.usersRepository.findById(userId);
-    if (!user || !user.refreshToken)
+    if (!user?.refreshToken)
       throw new UnauthorizedException('Access denied');
 
     const isValid = await bcrypt.compare(refreshToken, user.refreshToken);
@@ -92,37 +72,29 @@ export class AuthService {
 
     const tokens = this.generateTokens(user);
     const hashedRefresh = await bcrypt.hash(tokens.refreshToken, this.SALT_ROUNDS);
-    await this.usersRepository.updateRefreshToken(user, hashedRefresh);
+    await this.usersRepository.updateRefreshToken(user.id, hashedRefresh);
 
     return tokens;
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Sign Out
-  // ──────────────────────────────────────────────────────────────
-
-  async signOut(user: UserDocument): Promise<void> {
-    await this.usersRepository.updateRefreshToken(user, null);
+  async signOut(userId: string): Promise<void> {
+    await this.usersRepository.updateRefreshToken(userId, null);
   }
 
-  // ──────────────────────────────────────────────────────────────
-  // Helpers
-  // ──────────────────────────────────────────────────────────────
-
-  async validateUser(email: string, password: string): Promise<UserDocument> {
+  async validateUser(email: string, password: string): Promise<User> {
     const user = await this.usersRepository.findByEmail(email);
-    if (!user || !user.password)
+    if (!user?.passwordHash)
       throw new UnauthorizedException('Invalid credentials');
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
     return user;
   }
 
-  private generateTokens(user: UserDocument): TokensDto {
+  private generateTokens(user: User): TokensDto {
     const payload = {
-      userId: user._id.toString(),
+      userId: user.id,
       email: user.email,
     };
 

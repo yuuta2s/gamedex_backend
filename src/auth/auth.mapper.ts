@@ -1,21 +1,20 @@
 import { Injectable } from '@nestjs/common';
-
-import { UserDocument } from 'src/users/schema/user.schema';
+import { User } from '@prisma/client';
 import { AuthResponseDto, TokensDto, UserResponseDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthMapper {
-  toUserResponse(user: UserDocument): UserResponseDto {
+  toUserResponse(user: User): UserResponseDto {
     return {
-      id: user._id.toString(),
+      id: user.id,
       email: user.email ?? '',
       username: user.username,
-      avatar: user.avatar,
+      avatar: user.avatar ?? undefined,
       isSteamLinked: !!user.steamId,
     };
   }
 
-  toAuthResponse(user: UserDocument, tokens: TokensDto): AuthResponseDto {
+  toAuthResponse(user: User, tokens: TokensDto): AuthResponseDto {
     return {
       user: this.toUserResponse(user),
       tokens,

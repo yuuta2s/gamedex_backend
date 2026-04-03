@@ -1,15 +1,12 @@
 // src/users/users.repository.ts
 import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
+import { CreateSteamUserDto, CreateUserDto } from 'src/auth/dto/auth.dto';
 
 @Injectable()
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
-
-  async create(data: Prisma.UserCreateInput): Promise<User> {
-    return this.prisma.user.create({ data });
-  }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({ where: { email } });
@@ -23,23 +20,28 @@ export class UsersRepository {
     return this.prisma.user.findUnique({ where: { steamId } });
   }
 
-  async findOrCreateSteamUser(profile: {
-    steamId: string;
-    username: string;
-    avatar?: string;
-  }): Promise<User> {
-    return this.prisma.user.upsert({
-      where: { steamId: profile.steamId },
-      update: {},
-      create: {
-        steamId: profile.steamId,
-        username: profile.username,
-        avatar: profile.avatar,
-        steamDisplayName: profile.username,
-      },
-    });
-  }
+async create(dto: CreateUserDto & { passwordHash: string }): Promise<User> {
+  return this.prisma.user.create({
+    data: {
+      email: dto.email,
+      username: dto.username,
+      avatar: dto.avatar,
+      passwordHash: dto.passwordHash,
+    },
+  });
+}
 
+async findOrCreateSteamUser(dto: CreateSteamUserDto): Promise<User> {
+  return this.prisma.user.upsert({
+    where: { steamId: dto.steamId },
+    update: {},
+    create: {
+      steamId: dto.steamId,
+      username: dto.username,
+      avatar: dto.avatar,
+    },
+  });
+}
   async updateRefreshToken(
     userId: string,
     hashedToken: string | null,

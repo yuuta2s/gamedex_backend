@@ -13,14 +13,11 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { CreateUserDto, SignInDto } from './dto/auth.dto';
-import { UserDocument } from 'src/users/schema/user.schema';
-
+import { User } from '@prisma/client';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  // ── Email / Password ─────────────────────────────────────────
 
   @Post('sign-up')
   signUp(@Body() dto: CreateUserDto) {
@@ -34,10 +31,10 @@ export class AuthController {
   }
 
   @Post('sign-out')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(HttpStatus.OK)
   signOut(@Req() req: Request) {
-    return this.authService.signOut(req.user as UserDocument);
+    const user = req.user as User;
+    return this.authService.signOut(user.id);
   }
 
   @Post('refresh')
@@ -46,38 +43,19 @@ export class AuthController {
     return this.authService.refreshTokens(body.userId, body.refreshToken);
   }
 
-  // ── Steam OAuth ───────────────────────────────────────────────
-
-  /**
-   * Step 1: redirect the browser to Steam's login page.
-   * Passport handles the redirect automatically.
-   */
+  // Steam OAuth routes
   @Get('steam')
   @UseGuards(AuthGuard('steam'))
-  steamLogin() {
-    // Passport redirects – nothing to return here
-  }
+  steamLogin() {}
 
-  /**
-   * Step 2: Steam redirects back here after the user logs in.
-   * Passport validates the OpenID assertion and attaches req.user.
-   * We issue our own JWT tokens and redirect the client.
-   */
+
   @Get('steam/callback')
   @UseGuards(AuthGuard('steam'))
   async steamCallback(@Req() req: Request, @Res() res: Response) {
-    const authResponse = await this.authService.signInWithSteam(
-      req.user as UserDocument,
-    );
-
-    // Option A – SPA: redirect to frontend with tokens in query params
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
-    const { accessToken, refreshToken } = authResponse.tokens;
+    const user = req.user as User;
+    const authResponse = await this.authService.signInWithSteam(user);
     return res.redirect(
-      `${frontendUrl}/auth/callback?accessToken=${accessToken}&refreshToken=${refreshToken}`,
+      `${process.env.FRONTEND_URL}/auth/callback?token=${authResponse.tokens.accessToken}`
     );
-
-    // Option B – Return JSON directly (comment out redirect above, uncomment below)
-    // return res.json(authResponse);
   }
 }
